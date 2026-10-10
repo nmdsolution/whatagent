@@ -53,10 +53,14 @@ jobs:
           WASENDER_WEBHOOK_SECRET: ${{ secrets.WASENDER_WEBHOOK_SECRET }}
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           AI_MODEL: ${{ vars.AI_MODEL }}
+          ADVISOR_NUMBER: ${{ vars.ADVISOR_NUMBER }}
         run: |
           if [ -z "$WASENDER_API_KEY" ] || [ -z "$AI_API_KEY" ]; then
             echo "::error::Secrets WASENDER_API_KEY and AI_API_KEY must be set (Settings > Environments > production)."
             exit 1
+          fi
+          if [ -z "$ADVISOR_NUMBER" ]; then
+            echo "::warning::Variable ADVISOR_NUMBER is not set: no advisor is alerted when a request is complete."
           fi
           if [ -z "$WASENDER_WEBHOOK_SECRET" ]; then
             echo "::warning::WASENDER_WEBHOOK_SECRET is not set: the webhook accepts calls from anyone."
@@ -66,6 +70,7 @@ jobs:
             echo "WASENDER_WEBHOOK_SECRET=$WASENDER_WEBHOOK_SECRET"
             echo "AI_API_KEY=$AI_API_KEY"
             if [ -n "$AI_MODEL" ]; then echo "AI_MODEL=$AI_MODEL"; fi
+            if [ -n "$ADVISOR_NUMBER" ]; then echo "ADVISOR_NUMBER=$ADVISOR_NUMBER"; fi
           } | ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o ConnectTimeout=30 \
             "$VM_USER@$VM_HOST" "umask 077 && cat > '$DEPLOY_PATH/.env'"
 

@@ -29,6 +29,8 @@ AI_BASE_URL = os.getenv("AI_BASE_URL", "https://generativelanguage.googleapis.co
 MODEL = os.getenv("AI_MODEL", "gemini-3.5-flash-lite")     # modèle rapide, palier gratuit
 MAX_HISTORY = 20                                           # messages gardés par contact
 AI_RETRY_DELAY = 20                                        # secondes avant la 2e tentative IA
+# Numéro WhatsApp du conseiller prévenu à chaque demande (format international, sans +). Vide = aucune alerte.
+ADVISOR_NUMBER = "".join(c for c in os.getenv("ADVISOR_NUMBER", "") if c.isdigit())
 
 # ---- Messages fixes de la hotline (envoyés tels quels, sans passer par l'IA) ----
 WELCOME = """Bonjour 👋
@@ -209,6 +211,17 @@ DÉROULEMENT
   n'est pas joint : explique que tu ne peux pas l'écouter et demande poliment
   d'écrire la demande. N'écris jamais toi-même de texte entre crochets.
 
+TRANSMISSION AU CONSEILLER KMS
+- Quand tu envoies le récapitulatif final d'une demande, termine ton message par une
+  dernière ligne, seule, exactement de cette forme : #TRANSMETTRE 4 NORMAL
+  (le numéro du service de 1 à 8, puis URGENT pour une panne avec équipement à
+  l'arrêt, sinon NORMAL). Cette ligne n'est pas montrée au client : elle envoie ton
+  message au conseiller KMS. Sans elle, personne n'est prévenu.
+- Ajoute-la aussi, avec un court résumé de ce que tu sais, si le client veut être
+  rappelé ou parler à un conseiller sans remplir la fiche.
+- Ne l'ajoute qu'une fois par demande. Si le client apporte ensuite une information
+  nouvelle importante, renvoie le récapitulatif mis à jour avec la ligne.
+
 RÈGLES
 - Réponds dans la langue du client (français ou anglais), sur un ton chaleureux et
   professionnel. Si le client écrit en anglais, tout ton message est en anglais, y
@@ -285,6 +298,34 @@ async def send_whatsapp(to: str, text: str) -> None:
             print(f"[ERREUR envoi] {r.status_code} {r.text}")
 
 
+SERVICES = {
+    "1": "Assistance technique / Panne / SAV",
+    "2": "Demande commerciale",
+    "3": "Maintenance / Installation / Formation",
+    "4": "Devis / Proforma / Prix",
+    "5": "Commande / Livraison / Disponibilité",
+    "6": "Informatique médicale",
+    "7": "Mise en relation avec un conseiller",
+    "8": "Autre demande",
+}
+TRANSMIT = re.compile(r"\n?[ \t]*#TRANSMETTRE\b[ \t]*(\d)?[ \t]*(URGENT|NORMAL)?[ \t]*", re.I)
+
+
+def split_transmit(reply: str) -> tuple[str, str | None, bool]:
+    """Sépare le texte destiné au client de la ligne #TRANSMETTRE : (texte, service ou None, urgent)."""
+    m = TRANSMIT.search(reply)
+    if not m:
+        return reply, None, False
+    return TRANSMIT.sub("", reply).strip(), m.group(1) or "8", (m.group(2) or "").upper() == "URGENT"
+
+
+async def notify_advisor(sender: str, title: str, body: str) -> None:
+    if not ADVISOR_NUMBER:
+        return
+    await send_whatsapp(ADVISOR_NUMBER, f"{title}\n📱 Client : +{sender}\n👉 https://wa.me/{sender}\n\n{body}")
+    print(f"[ALERTE] conseiller prévenu pour ...{sender[-4:]}")
+
+
 EN_WORDS = set("the i you we is are do does have need want for and of to please thanks thank hello what how can my our your with from".split())
 FR_WORDS = set("le la les je vous nous est sont avez besoin veux pour et de du des svp merci bonjour bonsoir quoi comment mon notre votre avec un une".split())
 
@@ -327,9 +368,19 @@ async def handle_message(sender: str, text: str) -> None:
     reply = fixed_reply(conv, text)
     conv.append({"role": "user", "content": text})
     if reply is None:
-        reply = await ai_reply(conv) or FALLBACK
-    conv.append({"role": "assistant", "content": reply})
-    await send_whatsapp(sender, reply)
+        reply = await ai_reply(conv)
+    if not reply:
+        conv.append({"role": "assistant", "content": FALLBACK})
+        await send_whatsapp(sender, FALLBACK)
+        await notify_advisor(sender, "⚠️ *Hotline KMS : client à reprendre*",
+                             f"L'assistant n'a pas pu répondre. Dernier message du client :\n{text[:600]}")
+        return
+    conv.append({"role": "assistant", "content": reply})  # avec la ligne #TRANSMETTRE : l'IA sait que c'est fait
+    client_text, service, urgent = split_transmit(reply)
+    await send_whatsapp(sender, client_text)
+    if service:
+        title = ("🚨 *URGENT : " if urgent else "🔔 *") + "Nouvelle demande Hotline KMS*"
+        await notify_advisor(sender, title, f"🗂️ Service : {SERVICES.get(service, SERVICES['8'])}\n\n{client_text}")
 
 
 MEDIA_NOTES = {
