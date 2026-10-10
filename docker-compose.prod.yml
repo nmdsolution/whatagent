@@ -1,0 +1,16 @@
+# Production (OVH VPS). Secrets come from a `.env` file sitting next to this
+# file on the server, written by the deploy workflow (never committed).
+#
+# The project name is explicit so the container can never collide with the
+# other compose projects living on the same VPS.
+name: whatagent-prod
+
+services:
+  bot:
+    build:
+      context: .
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${BOT_PORT:-8100}:8000"
+    # Healthcheck (GET /) is defined in the Dockerfile.

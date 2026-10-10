@@ -1,0 +1,95 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to OVH VPS
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      VM_HOST: 135.125.75.107
+      VM_USER: ubuntu
+      DEPLOY_PATH: /opt/whatagent
+      BOT_PORT: "8100"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.OVH_VPS_SSH_KEY }}
+        run: |
+          if [ -z "$SSH_KEY" ]; then
+            echo "::error::Secret OVH_VPS_SSH_KEY is not set for this repository (Settings > Environments > production). Use the same private key as the ecommerce repository."
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$VM_HOST" >> ~/.ssh/known_hosts
+
+      # The code is shipped from this runner instead of `git pull` on the
+      # server, so the server needs no access to this repository.
+      - name: Copy code to the server
+        run: |
+          SSH="ssh -i $HOME/.ssh/deploy_key -o StrictHostKeyChecking=yes -o ConnectTimeout=30 $VM_USER@$VM_HOST"
+          $SSH "sudo mkdir -p '$DEPLOY_PATH' && sudo chown \"\$(id -un):\$(id -gn)\" '$DEPLOY_PATH'"
+          git archive --format=tar HEAD | $SSH "tar -xf - -C '$DEPLOY_PATH'"
+
+      # .env is rebuilt from the environment secrets on every deploy and sent
+      # over stdin, so the values never appear in a command line or a log.
+      - name: Write .env on the server
+        env:
+          WASENDER_API_KEY: ${{ secrets.WASENDER_API_KEY }}
+          WASENDER_WEBHOOK_SECRET: ${{ secrets.WASENDER_WEBHOOK_SECRET }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_MODEL: ${{ vars.AI_MODEL }}
+        run: |
+          if [ -z "$WASENDER_API_KEY" ] || [ -z "$AI_API_KEY" ]; then
+            echo "::error::Secrets WASENDER_API_KEY and AI_API_KEY must be set (Settings > Environments > production)."
+            exit 1
+          fi
+          if [ -z "$WASENDER_WEBHOOK_SECRET" ]; then
+            echo "::warning::WASENDER_WEBHOOK_SECRET is not set: the webhook accepts calls from anyone."
+          fi
+          {
+            echo "WASENDER_API_KEY=$WASENDER_API_KEY"
+            echo "WASENDER_WEBHOOK_SECRET=$WASENDER_WEBHOOK_SECRET"
+            echo "AI_API_KEY=$AI_API_KEY"
+            if [ -n "$AI_MODEL" ]; then echo "AI_MODEL=$AI_MODEL"; fi
+          } | ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o ConnectTimeout=30 \
+            "$VM_USER@$VM_HOST" "umask 077 && cat > '$DEPLOY_PATH/.env'"
+
+      - name: Deploy via SSH
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=30 \
+            -o ServerAliveInterval=30 \
+            "$VM_USER@$VM_HOST" \
+            "cd '$DEPLOY_PATH' && BOT_PORT='$BOT_PORT' bash scripts/server/deploy.sh < /dev/null"
+
+      - name: Check the bot from the internet
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if curl -fsS -m 10 "http://$VM_HOST:$BOT_PORT/"; then
+              echo
+              echo "Webhook URL: http://$VM_HOST:$BOT_PORT/webhook"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::The bot runs on the server but port $BOT_PORT is not reachable from the internet. Open it in the OVH firewall (and ufw if active)."
+          exit 1
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
