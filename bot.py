@@ -8,6 +8,7 @@ Lancer :  uvicorn bot:app --host 0.0.0.0 --port 8000
 """
 import os
 import hmac
+import logging
 from collections import defaultdict, deque
 
 import httpx
@@ -34,6 +35,16 @@ Si tu ne connais pas une information (prix, disponibilité, rendez-vous),
 dis que tu transmets la question à un responsable qui répondra rapidement.
 N'invente jamais de prix ni de promesses.
 """).strip()
+
+
+
+class _NoHealthcheck(logging.Filter):
+    """Retire des journaux le GET / du healthcheck Docker (toutes les 10 s)."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        return '"GET / ' not in record.getMessage()
+
+
+logging.getLogger("uvicorn.access").addFilter(_NoHealthcheck())
 
 app = FastAPI()
 ai = AsyncOpenAI(api_key=AI_API_KEY, base_url=AI_BASE_URL, timeout=60)
@@ -79,6 +90,7 @@ async def webhook(request: Request, background: BackgroundTasks):
     if WASENDER_WEBHOOK_SECRET:
         sig = request.headers.get("x-webhook-signature", "")
         if not hmac.compare_digest(sig, WASENDER_WEBHOOK_SECRET):
+            print("[WEBHOOK] refusé : signature absente ou incorrecte")
             return Response(status_code=401)
 
     payload = await request.json()
@@ -105,6 +117,7 @@ async def webhook(request: Request, background: BackgroundTasks):
     if not sender or not text:                        # médias sans texte : ignorés pour l'instant
         return {"ok": True}
 
+    print(f"[WEBHOOK] message reçu de ...{sender[-4:]}")  # numéro masqué, texte non journalisé
     # Répondre 200 tout de suite, traiter en arrière-plan
     background.add_task(handle_message, sender, text)
     return {"ok": True}

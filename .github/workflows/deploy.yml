@@ -19,6 +19,7 @@ jobs:
       VM_USER: ubuntu
       DEPLOY_PATH: /opt/whatagent
       BOT_PORT: "8100"
+      BOT_DOMAIN: bot.ndaoo.com
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -77,17 +78,18 @@ jobs:
             "$VM_USER@$VM_HOST" \
             "cd '$DEPLOY_PATH' && BOT_PORT='$BOT_PORT' bash scripts/server/deploy.sh < /dev/null"
 
+      # Generous: on the first deploy Caddy still has to obtain the certificate.
       - name: Check the bot from the internet
         run: |
-          for attempt in 1 2 3 4 5; do
-            if curl -fsS -m 10 "http://$VM_HOST:$BOT_PORT/"; then
+          for attempt in $(seq 1 12); do
+            if curl -fsS -m 10 "https://$BOT_DOMAIN/"; then
               echo
-              echo "Webhook URL: http://$VM_HOST:$BOT_PORT/webhook"
+              echo "Webhook URL: https://$BOT_DOMAIN/webhook"
               exit 0
             fi
-            sleep 5
+            sleep 10
           done
-          echo "::error::The bot runs on the server but port $BOT_PORT is not reachable from the internet. Open it in the OVH firewall (and ufw if active)."
+          echo "::error::The bot runs on the server but https://$BOT_DOMAIN/ is not reachable. Check that $BOT_DOMAIN points to $VM_HOST and that port 443 is open."
           exit 1
 
       - name: Cleanup SSH key

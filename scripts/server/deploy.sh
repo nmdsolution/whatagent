@@ -26,6 +26,8 @@ fi
 
 $COMPOSE build bot
 $COMPOSE up -d --remove-orphans
+# Picks up a changed Caddyfile without dropping connections.
+$COMPOSE exec -T caddy caddy reload --config /etc/caddy/Caddyfile || true
 
 for attempt in $(seq 1 20); do
   container_id="$($COMPOSE ps -q bot)"

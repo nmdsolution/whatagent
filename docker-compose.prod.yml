@@ -14,3 +14,20 @@ services:
     ports:
       - "${BOT_PORT:-8100}:8000"
     # Healthcheck (GET /) is defined in the Dockerfile.
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - bot
+    ports:
+      - "443:443"
+    volumes:
+      # The directory (not the file) is mounted so a redeployed Caddyfile is
+      # visible inside the container.
+      - ./caddy:/etc/caddy:ro
+      - caddy_data:/data
+
+volumes:
+  # Holds the TLS certificate: keep it across redeploys.
+  caddy_data:

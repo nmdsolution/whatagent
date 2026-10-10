@@ -1,0 +1,10 @@
+# HTTPS front for the bot. Port 80 on this server belongs to another project,
+# so only 443 is published: the certificate is obtained with the TLS-ALPN
+# challenge and there is no HTTP -> HTTPS redirect.
+{
+	auto_https disable_redirects
+}
+
+bot.ndaoo.com {
+	reverse_proxy bot:8000
+}
