@@ -33,122 +33,52 @@ SEND_ATTEMPTS = 5                                          # essais d'envoi quan
 # Numéro WhatsApp du conseiller prévenu à chaque demande (format international, sans +). Vide = aucune alerte.
 ADVISOR_NUMBER = "".join(c for c in os.getenv("ADVISOR_NUMBER", "") if c.isdigit())
 
-# ---- Messages fixes de la hotline (envoyés tels quels, sans passer par l'IA) ----
-WELCOME = """Bonjour 👋
+# ---- Message d'accueil de la hotline (envoyé tel quel, sans passer par l'IA) ----
+WELCOME = """👋 Bienvenue sur la Hotline *KASI MEDICAL SOLUTIONS (KMS)*
 
-Bienvenue sur la Hotline *KASI MEDICAL SOLUTIONS (KMS)*.
-Merci de nous avoir contactés. Pour traiter rapidement votre demande, choisissez le service souhaité :
+Pour un traitement rapide de votre demande, merci de nous communiquer :
 
-1️⃣ 🛠️ Assistance technique / Panne / SAV
-2️⃣ 🛒 Demande commerciale / Équipement / Consommables
-3️⃣ 📋 Maintenance / Installation / Formation
-4️⃣ 💰 Demande de devis / Proforma / Prix
-5️⃣ 📦 Commande / Livraison / Disponibilité produit
-6️⃣ 💻 Informatique médicale / Logiciel / DICOM
-7️⃣ 📞 Être mis en relation avec un conseiller KMS
-8️⃣ Autre demande
-
-👉 Répondez avec le numéro de votre choix, ou écrivez directement votre besoin.
-🇬🇧 You can also write to us in English.
-
-*KASI MEDICAL SOLUTIONS*
-Équipements • Solutions • Maintenance • Service après-vente"""
-
-_IDENTITE = """🏥 Établissement / Société :
+👤 Nom et prénom :
+🏥 Structure / Établissement :
 📍 Ville :
-👤 Nom et fonction :"""
 
-FORMS = {
-    "1": f"""Nous sommes désolés pour ce désagrément. 🛠️ Notre équipe technique va vous aider.
+📋 Objet de votre demande :
 
-Merci de nous indiquer :
+1️⃣ 🚨 Urgence technique
+2️⃣ 🛠️ Assistance technique / SAV
+3️⃣ 🛒 Produits / Prix / Devis
+4️⃣ 📦 Commandes / Livraisons
+5️⃣ 🔧 Maintenance / Installation
+6️⃣ 💻 Informatique médicale
+7️⃣ 💰 Facturation / Paiements
+8️⃣ 🤝 Autres demandes
 
-{_IDENTITE}
-⚙️ Équipement concerné (marque, modèle, n° de série si possible) :
-⚠️ Panne constatée ou message d'erreur :
-📅 Depuis quand :
-🚨 L'équipement est-il totalement à l'arrêt ? (oui / non)
+✍️ Décrivez brièvement votre besoin en précisant le numéro correspondant.
 
-Une photo ou une courte vidéo de la panne nous aide à diagnostiquer plus vite.
+✅ Notre équipe vous répondra dans les meilleurs délais.
 
-Un technicien KMS prendra votre demande en charge.""",
-    "2": f"""Merci pour votre intérêt pour les solutions KMS. 🤝
+🇬🇧 English welcome.
 
-Afin de mieux répondre à votre besoin, merci de nous indiquer :
+*KMS – Votre partenaire en solutions médicales.*"""
 
-{_IDENTITE}
-🔎 Équipement ou produit recherché :
-🔢 Quantité souhaitée :
-📅 Délai souhaité :
-
-Vous pouvez aussi nous envoyer une photo, une référence ou une fiche technique du produit recherché.
-
-Un conseiller KMS prendra votre demande en charge.""",
-    "3": f"""Merci de faire confiance à KMS pour vos équipements. 📋
-
-Merci de nous indiquer :
-
-{_IDENTITE}
-🧰 Prestation souhaitée (maintenance préventive, réparation, installation, formation) :
-⚙️ Équipement(s) concerné(s) (marque, modèle, nombre) :
-📅 Période souhaitée :
-
-Notre service technique vous proposera une date d'intervention.""",
-    "4": f"""Avec plaisir, nous préparons votre proforma. 💰
-
-Merci de nous indiquer :
-
-{_IDENTITE}
-🔎 Produit(s) ou référence(s) :
-🔢 Quantité pour chaque produit :
-🚚 Ville de livraison :
-📅 Délai souhaité :
-
-Une photo, une référence ou une ancienne facture nous permet d'aller plus vite.
-
-Un conseiller KMS vous enverra la facture proforma.""",
-    "5": f"""Nous vérifions cela pour vous. 📦
-
-Merci de nous indiquer :
-
-{_IDENTITE}
-🧾 Numéro de proforma, de commande ou de facture (si vous en avez un) :
-🔎 Produit concerné et quantité :
-🚚 Ville de livraison :
-
-Un conseiller KMS vous confirmera la disponibilité ou l'état de votre livraison.""",
-    "6": f"""Notre équipe informatique médicale est à votre écoute. 💻
-
-Merci de nous indiquer :
-
-{_IDENTITE}
-🧩 Votre besoin (PACS, RIS, DICOM, logiciel, réseau, impression de films...) :
-⚙️ Équipements concernés (marque, modèle) :
-📝 Problème rencontré ou projet envisagé :
-
-Une capture d'écran du message d'erreur est la bienvenue.
-
-Un spécialiste KMS prendra votre demande en charge.""",
-    "7": f"""Un conseiller KMS va vous recontacter. 📞
-
-Pour vous orienter vers la bonne personne, merci de nous indiquer :
-
-{_IDENTITE}
-📝 Objet de votre demande :
-🕘 Meilleur moment pour vous joindre :
-
-Vous pouvez aussi appeler directement le 6 90 36 83 77 ou le 6 81 09 72 07.""",
-    "8": """Bien sûr. ✍️ Décrivez-nous votre demande en quelques mots, en précisant votre établissement et votre ville.
-
-Notre équipe vous orientera vers le bon interlocuteur.""",
+SERVICES = {
+    "1": "🚨 Urgence technique",
+    "2": "🛠️ Assistance technique / SAV",
+    "3": "🛒 Produits / Prix / Devis",
+    "4": "📦 Commandes / Livraisons",
+    "5": "🔧 Maintenance / Installation",
+    "6": "💻 Informatique médicale",
+    "7": "💰 Facturation / Paiements",
+    "8": "🤝 Autres demandes",
 }
 
 # ---- Personnalité et connaissances du bot (suite de la conversation, gérée par l'IA) ----
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT", """
 Tu es l'assistant de la Hotline WhatsApp de KASI MEDICAL SOLUTIONS SARL (KMS),
-fournisseur de matériel médical basé à Yaoundé, Cameroun. Slogan : « Votre partenaire
-pour une santé de qualité ! ». Tes clients sont des hôpitaux, cliniques, cabinets,
-centres d'imagerie, laboratoires et professionnels de santé.
+fournisseur de matériel médical basé à Yaoundé, Cameroun. Tes clients sont des
+hôpitaux, cliniques, cabinets, centres d'imagerie, laboratoires et professionnels
+de santé. Ton rôle : recueillir la demande du client en un minimum de messages,
+puis la transmettre à l'équipe KMS.
 
 CE QUE FAIT KMS (équipements, solutions, maintenance, service après-vente)
 - Imagerie médicale : radiologie, échographie (appareils et sondes), scanner,
@@ -171,41 +101,36 @@ INFORMATIONS PRATIQUES
   salesteam@kasimedicalsolutions.com, www.kasimedicalsolutions.com.
 - Adresse postale : BP 7468 Yaoundé.
 
-LES 8 SERVICES DE LA HOTLINE ET LES INFORMATIONS À RECUEILLIR
-""" + "\n\n".join(f"--- Service {n} ---\n{form}" for n, form in FORMS.items()) + """
+LE MESSAGE D'ACCUEIL QUE LE CLIENT A REÇU
+""" + WELCOME + """
 
-LIBELLÉS DES FICHES EN ANGLAIS (à utiliser tels quels si le client écrit en anglais)
-🏥 Facility / Company:
-📍 City:
-👤 Name and position:
-🔎 Equipment or product needed:
-🔢 Quantity:
-📅 Desired timeframe:
-🚚 Delivery city:
-⚙️ Equipment concerned (brand, model, serial number if possible):
-⚠️ Fault observed or error message:
-🚨 Is the equipment completely down? (yes / no)
-🧰 Service needed (preventive maintenance, repair, installation, training):
-🧾 Proforma, order or invoice number (if any):
-🧩 Your need (PACS, RIS, DICOM, software, network, film printing...):
-📝 Subject of your request:
-🕘 Best time to reach you:
+LA DEMANDE À RECUEILLIR (5 éléments)
+👤 Nom et prénom
+🏥 Structure / Établissement
+📍 Ville
+📋 Objet (un des 8 ci-dessus)
+✍️ Besoin (ce que le client veut, en quelques mots)
 
 DÉROULEMENT
-- Le client reçoit d'abord le menu des 8 services. S'il répond par un numéro, il
-  reçoit la fiche du service. S'il écrit directement son besoin, choisis toi-même
-  le service qui correspond, sans lui demander de numéro.
-- Ne redemande jamais une information que le client a déjà donnée. Reprends ce
-  qu'il a écrit et demande seulement ce qui manque, en reprenant les lignes de la
-  fiche (avec leur emoji), une par ligne. S'il manque une ou deux informations,
-  pose simplement la question en une phrase.
-- Si le client ne veut pas ou ne peut pas donner une information, n'insiste pas.
-- Quand la fiche est complète, envoie un récapitulatif court (une ligne par
-  information), puis annonce que l'équipe KMS concernée prend la demande en charge
-  et le recontacte. Pour une panne avec équipement à l'arrêt, précise que la
-  demande est signalée comme urgente.
-- Si le client change de sujet, passe au service correspondant. S'il écrit
-  « menu », le menu lui est renvoyé automatiquement.
+- Le client répond en général à l'accueil en un seul message, souvent en vrac et
+  sans libellés. Retrouve toi-même les 5 éléments dans ce qu'il écrit. S'il ne
+  donne pas de numéro, déduis l'objet de son besoin. Une panne qui met un
+  équipement à l'arrêt ou bloque l'activité relève de l'objet 1 (urgence).
+- Si les éléments essentiels sont là (le besoin, plus la structure ou le nom),
+  envoie tout de suite le récapitulatif et transmets : ne pose pas de question
+  de plus. Les précisions utiles (marque, modèle, quantité, numéro de facture ou
+  de commande) seront demandées par le conseiller.
+- Sinon, demande en UN seul message court ce qui manque, en reprenant les lignes
+  avec leur emoji. Si le client n'a envoyé qu'un numéro, demande-lui son nom, sa
+  structure, sa ville et une courte description du besoin.
+- Ne redemande jamais une information déjà donnée. Ne relance qu'une fois : si le
+  client ne complète pas, transmets avec ce que tu as.
+- Le récapitulatif est court : une ligne par élément, avec l'objet écrit comme
+  dans le menu, puis une phrase annonçant que l'équipe KMS le recontacte dans les
+  meilleurs délais (pour l'objet 1 : que la demande est signalée comme urgente).
+- Après la transmission, réponds simplement aux messages suivants. Si le client
+  ajoute une information importante ou une nouvelle demande, renvoie un
+  récapitulatif mis à jour et transmets à nouveau.
 - Un message entre crochets comme [Photo reçue] signale un fichier envoyé par le
   client : tu ne peux pas l'ouvrir. Pour une photo, une vidéo ou un document,
   remercie et dis qu'il est joint à la demande pour l'équipe KMS. Un message vocal
@@ -213,22 +138,26 @@ DÉROULEMENT
   d'écrire la demande. N'écris jamais toi-même de texte entre crochets.
 
 TRANSMISSION AU CONSEILLER KMS
-- Quand tu envoies le récapitulatif final d'une demande, termine ton message par une
-  dernière ligne, seule, exactement de cette forme : #TRANSMETTRE 4 NORMAL
-  (le numéro du service de 1 à 8, puis URGENT pour une panne avec équipement à
-  l'arrêt, sinon NORMAL). Cette ligne n'est pas montrée au client : elle envoie ton
-  message au conseiller KMS. Sans elle, personne n'est prévenu.
-- Ajoute-la aussi, avec un court résumé de ce que tu sais, si le client veut être
-  rappelé ou parler à un conseiller sans remplir la fiche.
-- Ne l'ajoute qu'une fois par demande. Si le client apporte ensuite une information
-  nouvelle importante, renvoie le récapitulatif mis à jour avec la ligne.
+- Chaque fois que tu envoies un récapitulatif, termine ton message par une
+  dernière ligne, seule, exactement de cette forme : #TRANSMETTRE 3 NORMAL
+  (le numéro de l'objet de 1 à 8, puis URGENT pour l'objet 1, sinon NORMAL).
+  Cette ligne n'est pas montrée au client : elle envoie ton message au conseiller
+  KMS. Sans elle, personne n'est prévenu.
+- N'ajoute jamais cette ligne à un message qui pose une question au client.
+
+LIBELLÉS EN ANGLAIS (à utiliser si le client écrit en anglais)
+👤 Full name:
+🏥 Facility / Company:
+📍 City:
+📋 Subject: 1 Technical emergency, 2 Technical support / After-sales,
+3 Products / Prices / Quotes, 4 Orders / Deliveries, 5 Maintenance / Installation,
+6 Medical IT, 7 Invoicing / Payments, 8 Other requests
+✍️ Your need:
 
 RÈGLES
 - Réponds dans la langue du client (français ou anglais), sur un ton chaleureux et
-  professionnel. Si le client écrit en anglais, tout ton message est en anglais, y
-  compris les lignes des fiches, et tu restes en anglais pour la suite, même après
-  un message entre crochets. Messages courts, comme sur WhatsApp ; quelques emojis,
-  sans excès.
+  professionnel. Si le client écrit en anglais, tout ton message est en anglais.
+  Messages courts, comme sur WhatsApp ; quelques emojis, sans excès.
   Pour le gras, utilise *une seule étoile* de chaque côté ; pas de titres, pas de
   tableaux, pas de liens formatés.
 - Ne donne jamais de prix, de remise, de délai ni de disponibilité en stock : seul
@@ -241,7 +170,7 @@ RÈGLES
   manipulation technique de l'appareil : l'équipe technique s'en charge.
 - Si tu ne connais pas une information, dis que tu transmets la question à un
   conseiller KMS. N'invente rien.
-- Ne cite pas le slogan et ne te présente pas à nouveau à chaque message.
+- Ne te présente pas à nouveau et ne renvoie pas le menu toi-même.
 """).strip()
 
 # Envoyé si l'IA ne répond pas : le client ne reste jamais sans réponse.
@@ -264,13 +193,10 @@ def _plain(text: str) -> str:
 
 
 def fixed_reply(conv: deque, text: str) -> str | None:
-    """Réponse fixe (menu ou fiche d'un service) quand elle s'applique, sinon None."""
+    """Message d'accueil fixe quand il s'applique (premier bonjour, ou « menu »), sinon None."""
     plain = _plain(text)
     if plain == "menu" or (not conv and (not plain or GREETING.fullmatch(plain))):
         return WELCOME
-    last = conv[-1]["content"] if conv else ""
-    if last == WELCOME and plain in FORMS:
-        return FORMS[plain]
     return None
 
 
@@ -318,16 +244,6 @@ async def send_whatsapp(to: str, text: str) -> bool:
     return False
 
 
-SERVICES = {
-    "1": "Assistance technique / Panne / SAV",
-    "2": "Demande commerciale",
-    "3": "Maintenance / Installation / Formation",
-    "4": "Devis / Proforma / Prix",
-    "5": "Commande / Livraison / Disponibilité",
-    "6": "Informatique médicale",
-    "7": "Mise en relation avec un conseiller",
-    "8": "Autre demande",
-}
 TRANSMIT = re.compile(r"\n?[ \t]*#TRANSMETTRE\b[ \t]*(\d)?[ \t]*(URGENT|NORMAL)?[ \t]*", re.I)
 
 
