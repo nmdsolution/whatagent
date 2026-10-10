@@ -29,6 +29,7 @@ AI_BASE_URL = os.getenv("AI_BASE_URL", "https://generativelanguage.googleapis.co
 MODEL = os.getenv("AI_MODEL", "gemini-3.5-flash-lite")     # modèle rapide, palier gratuit
 MAX_HISTORY = 20                                           # messages gardés par contact
 AI_RETRY_DELAY = 20                                        # secondes avant la 2e tentative IA
+SEND_ATTEMPTS = 5                                          # essais d'envoi quand Wasender limite le débit
 # Numéro WhatsApp du conseiller prévenu à chaque demande (format international, sans +). Vide = aucune alerte.
 ADVISOR_NUMBER = "".join(c for c in os.getenv("ADVISOR_NUMBER", "") if c.isdigit())
 
@@ -285,17 +286,36 @@ app = FastAPI()
 ai = AsyncOpenAI(api_key=AI_API_KEY, base_url=AI_BASE_URL, timeout=60)
 history: dict[str, deque] = defaultdict(lambda: deque(maxlen=MAX_HISTORY))
 seen_ids: deque = deque(maxlen=500)  # évite de répondre deux fois au même message
+send_lock = asyncio.Lock()
+sender_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)  # messages d'un client traités dans l'ordre
 
 
-async def send_whatsapp(to: str, text: str) -> None:
-    async with httpx.AsyncClient(timeout=30) as client:
-        r = await client.post(
-            "https://www.wasenderapi.com/api/send-message",
-            headers={"Authorization": f"Bearer {WASENDER_API_KEY}"},
-            json={"to": to, "text": text},
-        )
-        if r.status_code >= 400:
-            print(f"[ERREUR envoi] {r.status_code} {r.text}")
+async def send_whatsapp(to: str, text: str) -> bool:
+    """Envoie un message ; en cas de limite de débit Wasender (429), attend puis réessaie. True si envoyé."""
+    async with send_lock:                              # un envoi à la fois : respecte la limite du compte
+        for attempt in range(1, SEND_ATTEMPTS + 1):
+            try:
+                async with httpx.AsyncClient(timeout=30) as client:
+                    r = await client.post(
+                        "https://www.wasenderapi.com/api/send-message",
+                        headers={"Authorization": f"Bearer {WASENDER_API_KEY}"},
+                        json={"to": to, "text": text},
+                    )
+            except httpx.HTTPError as e:
+                print(f"[ERREUR envoi] {type(e).__name__} {e}")
+                return False
+            if r.status_code < 400:
+                return True
+            if r.status_code != 429 or attempt == SEND_ATTEMPTS:
+                print(f"[ERREUR envoi] abandon vers ...{to[-4:]} : {r.status_code} {r.text[:200]}")
+                return False
+            try:
+                wait = int(r.json().get("retry_after", 60))
+            except ValueError:
+                wait = 60
+            print(f"[ENVOI] limite Wasender atteinte, nouvel essai dans {wait + 1} s (tentative {attempt}/{SEND_ATTEMPTS})")
+            await asyncio.sleep(min(wait, 120) + 1)
+    return False
 
 
 SERVICES = {
@@ -322,8 +342,8 @@ def split_transmit(reply: str) -> tuple[str, str | None, bool]:
 async def notify_advisor(sender: str, title: str, body: str) -> None:
     if not ADVISOR_NUMBER:
         return
-    await send_whatsapp(ADVISOR_NUMBER, f"{title}\n📱 Client : +{sender}\n👉 https://wa.me/{sender}\n\n{body}")
-    print(f"[ALERTE] conseiller prévenu pour ...{sender[-4:]}")
+    ok = await send_whatsapp(ADVISOR_NUMBER, f"{title}\n📱 Client : +{sender}\n👉 https://wa.me/{sender}\n\n{body}")
+    print(f"[ALERTE] conseiller {'prévenu' if ok else 'NON PRÉVENU (envoi échoué)'} pour ...{sender[-4:]}")
 
 
 EN_WORDS = set("the i you we is are do does have need want for and of to please thanks thank hello what how can my our your with from".split())
@@ -364,6 +384,11 @@ async def ai_reply(conv: deque) -> str:
 
 
 async def handle_message(sender: str, text: str) -> None:
+    async with sender_locks[sender]:
+        await _handle_message(sender, text)
+
+
+async def _handle_message(sender: str, text: str) -> None:
     conv = history[sender]
     reply = fixed_reply(conv, text)
     conv.append({"role": "user", "content": text})
